@@ -21,29 +21,97 @@
 
 ## Штуки, которые меня замедляли
 
-1. методы в interface ICheats. Возвращаемый тип, имя метода и аргументы не сходятся по смыслу. 
+### 1. методы в interface ICheats. Возвращаемый тип, имя метода и аргументы не сходятся по смыслу. 
 
-1.1 Методы с Get в названии по смыслу должны что-то возвращать. Здесь же (понял только когда открыл dll) должно быть AddX. Но лучше даже уточнить куда "Add" - в верстан, инвентарь, или добавляется бонус "к дереву" за срубку дерева.
+  1.1 Методы с Get в названии по смыслу должны что-то возвращать. Здесь же (понял только когда открыл dll) должно быть AddX. Но лучше даже уточнить куда "Add" - в верстан, инвентарь, или добавляется бонус "к дереву" за срубку дерева.
+  
+  ![image](https://github.com/user-attachments/assets/ff911ca7-da57-4ac5-b48b-2e4daef185f3)
+  
+  1.2 должно быть "IsXEmpty", т.к. тут ничего не "считается"("Count" в названии не нужен). 
+  
+  ![image](https://github.com/user-attachments/assets/c1a9ff59-c093-4b8c-9306-1e41222ab23f)
+  
+  1.2.1 Метод CountIsEmpty скорее бы выглядел как-то так:  
+  
+  ![image](https://github.com/user-attachments/assets/3e33e295-bae0-4286-ae70-eb8bba4a1168)
+  
+  *просто для примера. В предоставленном проекте Inventory и Cell другие. 
+  
+  1.3 Неясно, имелось ли ввиду IsTreeFelled, или MarkTreeAsFelled, где return это ```bool markesSuccessfully```
+  
+  ![image](https://github.com/user-attachments/assets/9ac5278a-dae5-4c29-b90f-bbe96867bf61)
+  
+  1.4 `GetGmGo();` чтобы понять что значит сокращение "Gm", пришлось снова лезть в dll. 
 
-![image](https://github.com/user-attachments/assets/ff911ca7-da57-4ac5-b48b-2e4daef185f3)
 
-1.2 должно быть "IsXEmpty", тут ничего не "считается"("Count" не нужен). 
+### 2. ButtonsGroup.cs
+   
+2.1 Лучше не держать такую объёмную логику в конструкторе. И в любом случает лучше разбить на методы или локальные функции по нескольку строк. ```Code should read like well-written prose and be clean, lean, and easy to maintain.```
+2.2 в используемых в классе словарях ключом было бы лучше сделать enum. Это избавит от возможных опечаток, и это даст человеку, изучающему фреймворк посмотреть сразу список всех опций. 
 
-![image](https://github.com/user-attachments/assets/c1a9ff59-c093-4b8c-9306-1e41222ab23f)
+![image](https://github.com/user-attachments/assets/07747ecd-0275-49ee-b0f3-1c6bcb36014b)
 
-1.2.1 Метод CountIsEmpty скорее бы выглядел как-то так:  
+В идеале, эти словари обернуть в свои классы, чтобы их назначении стало понятнее. 
 
-![image](https://github.com/user-attachments/assets/3e33e295-bae0-4286-ae70-eb8bba4a1168)
+### 3. Дубляж строковых id.
+  Например, в UiTestContext.Inventory { get { return _buttons["inventory"]; } } //строка `"inventory"`
+  
+  и в UiTest_Framework\UiTest\UiTestDll\UiTest\Context\Consts\Inventory\Inventory.Id //тоже строка `"inventory"`
 
-*просто для примера. В предоставленном проекте Inventory и Cell другие. 
+   ![image](https://github.com/user-attachments/assets/234cae29-29c3-423b-977d-53f26711ef76)
 
-1.3 Неясно, имелось ли ввиду IsTreeFelled, или MarkTreeAsFelled, где return это ```bool markesSuccessfully```
+  
+  При расширении кода кто-то может забыть, что всё слово в нижнем регистре, и попытаться обратиться через buttons["INVENTORY"] или buttons["Inventory"], в результате чего произойдёт ошибка. Лучше держать строку в одном месте, а во всех других местах всегда обращаться через Inventory.Id, или организовать отдельный класс Constants.
+  Эта ситуация описывается в принципе DRY.
 
-![image](https://github.com/user-attachments/assets/9ac5278a-dae5-4c29-b90f-bbe96867bf61)
+### 4. Также, затупы я испытывал и при изучении dll:
+4.1 
+UiTest\Scripts\Cheats.cs
+```CSharp
+Camera worldCamera = GameObject.Find("UICanvas").GetComponent<Canvas>().worldCamera;
+```
+Метод GameObject.Find ненадёжный. Геймдизайнер может случайно переименовать имя GameObject, тогда поиск не найдёт ничего. Лучше искать хотя бы по типу: FindObjectOfType. 
+4.2 Это ещё ненадёжнее: сломается также если кто-то передвинеть объекты в иерархии
+```CSharp
+public List<GameObject> FindTree( )
+{
+    return ( from tree in GameObject.Find( "trees" ).GetComponentsInChildren<TreeContainer>() select tree.gameObject ).ToList<GameObject>();
+}
+```
 
-1.4 `GetGmGo();` чтобы понять что значит сокращение "Gm", пришлось снова лезть в dll. 
+5. Нарушение LSP (нужно разделить интерфейсы) в половине реализующих IUiTestChecker (например, UseButtonIsActiveChecker)
+```CSharp
+public void Init()
+{
+    throw new System.NotImplementedException();
+}
+```
+
+6. Commands.cs. в половине методов чувствуется дубляж кода. Лучше переиспользовать код в приватном методе/методах, если логика частично совпадает.
+   
+![image](https://github.com/user-attachments/assets/c3d1f9ef-e80d-4939-9849-11ceafb60ea7)
+
+## outro
+
+Всё это, вкупе с мелкими помарками, по типу 
+	- опечатка "On" 2 раза: ContextOnOnErrorDetect 
+	- namespace Assets.UiTest.TestSteps; Namespace does not correspond to file location, should be: 'UiTest.UiTest.TestSteps'
+замедляет, и вынуждает нырять в кишки фреймворка. 
 
 
+Я привык писать тесты с Unity Test Framework, в отдельной .asmdef, но в том же проекте где и код игры. Когда сразу виден тестируемый код, то в тестах можно и переиспользовать некоторые DTO и типы с логикой, а также сразу можно проверить написанный тест на:
+  1) ложноПоложительность: тест должен стать красным, если логика сломалась в сути.
+  2) ложноОтрицательность: тест НЕ должен стать красным, если логика по сути не ломалась, если вносились косметические изменения.
+Т.е. после написания теста внести изменения в рабочий код, проверить поведение теста, и откатить изменения в рабочем коде. 
+В предоставленном мне фреймворке код тестов отделён от кода проекта, что замедляет изучение. 
+
+Приятнее когда фреймворк именно помогает писать, а не загадывает загадки. Например, даёт удобный синтаксис утверждений по типу
+- exampleObject.Value.Should().Be(20);
+- Assert.AreEqual( 1, someArr.Length );
+
+
+Я всё ещё готов к лайвкодингу. Но если там снова будет задача по этому фреймворку, то у меня все эти вопросы останутся. 
+Я уверен, фреймворк может выполнять свои задачи. Но для тестового задания он выглядит грубовато. У не знакомого с этим кодом человека уйдёт на вкат в технологию слишком много вопросов, и вместо тестового будет "борьба с фреймворком".
 
 
 
